@@ -93,13 +93,13 @@
 		\texttt{u16}, \texttt{s16},
 		\texttt{u32}, \texttt{s32},
 		\texttt{u64}, and \texttt{s64}.
-		\begin{itemize}
-		%--------
-		\item There are some limitations on operations done with the
-			\texttt{u64} and \texttt{s64} types. See the instruction
-			lists for more details.
-		%--------
-		\end{itemize}.
+		%\begin{itemize}
+		%%--------
+		%\item There are some limitations on operations done with the
+		%	\texttt{u64} and \texttt{s64} types. See the instruction
+		%	lists for more details.
+		%%--------
+		%\end{itemize}.
 	%\item 32-bit and 64-bit IEEE 754 floats are supported; these types are
 	%	named \texttt{f32} and \texttt{f64}, respectively.
 	%	\begin{itemize}
@@ -128,15 +128,21 @@
 			fields set to zero, and when written to, the contents of the
 			ILAR does not change.
 		\item The two ILARs called "\texttt{ipc}" are the program counters
-			for the two operating modes of the processor. The location
-			within the \texttt{ipc} ILARs can be computed by taking the low
-			6 bits (6 because 128 bytes long ILARs) of their addresses.
+			for the two operating modes of the processor.
+			%The location
+			%within the \texttt{ipc} ILARs can be computed by taking the low
+			%5 bits
+			%%(5 because 128 bytes long ILARs, and forced alignment of
+			%%instructions)
+			%of their addresses. The number of bits is (7 - 2 = 5)
+			%because of alignment of 
 		\item An ILAR's data field is 128 bytes long. It is composed of
 			32-bit instructions aligned to 32 bits.
 		\item An ILAR's scalar offset field is (7 - 2 = 5)-bit due to
 			instructions being 32-bit and the data field being 128 bytes
 			long.
-		\item The base address field of an ILAR is (32 - 6 = 26)-bit.
+		\item The \texttt{base\_address} field of an ILAR is
+			(32 - 6 = 26)-bit.
 		\item An ILAR's tag field is 7-bit because there are 128 total
 			ILARs.
 		%--------
@@ -195,10 +201,12 @@
 			\item 16-bit, signed (\texttt{s16})
 			\item 32-bit, unsigned (\texttt{u32})
 			\item 32-bit, signed (\texttt{s32})
-			\item 64-bit, unsigned (\texttt{u64});
-				only usable for some operations
-			\item 64-bit, signed (\texttt{s64});
-				only usable for some operations
+			\item 64-bit, unsigned (\texttt{u64})
+				%;
+				%only usable for some operations
+			\item 64-bit, signed (\texttt{s64})
+				%;
+				%only usable for some operations
 			%--------
 			\end{itemize}
 		\item A DLAR's tag field is 7-bit because there are 128 total
@@ -208,15 +216,15 @@
 		\item A DLAR's dirty field is 1-bit.
 		%--------
 		\end{itemize}
-	\item The \texttt{inten} register
+	\item The \texttt{ie} register
 		\begin{itemize}
 		%--------
-		\item "\texttt{inten}" is short for "interrupt enable".
+		\item "\texttt{ie}" is short for "interrupt enable".
 		\item This register is 1-bit.
 		\item This register is a flag indicating whether or not an
 			interrupt can be serviced. It can be read from/written to using
 			\texttt{cpy} instructions.
-		\item The \texttt{reti} instruction sets \texttt{inten} to
+		\item The \texttt{reti} instruction sets \texttt{ie} to
 			\texttt{0b1} and returns to user mode from supervisor mode.
 		%--------
 		\end{itemize}
@@ -281,7 +289,7 @@
 	%--------
 	\item When \texttt{xct == 0x0}: Nothing.
 	\item When \texttt{xct == 0x1}:
-		Taking a non-software interrupt (which would also set \texttt{inten}
+		Taking a non-software interrupt (which would also set \texttt{ie}
 		to \texttt{0b0}).
 	\item When \texttt{xct == 0x2}: \texttt{swi}.
 	\item When \texttt{xct == 0x3}: \texttt{reti} when in user mode.
@@ -289,12 +297,20 @@
 	\item When \texttt{xct == 0x5}: Undefined instruction.
 	\item When \texttt{xct == 0x6}: Division by zero.
 	\item When \texttt{xct == 0x7}:
-		Instructions where 64-bit ops are not defined.
+		%Instructions where 64-bit ops are not defined.
+		Reserved for future expansion.
+		\begin{itemize}
+		%--------
+		\item Note: This value of \texttt{xct} might be used for
+			floating point exceptions in
+			a future revision of this document.
+		%--------
+		\end{itemize}
 
 	\item When \texttt{xct == 0x8}:
-		\texttt{cpy.s} that reads from \texttt{inten} in user mode.
+		\texttt{cpy.s} that reads from \texttt{ie} in user mode.
 	\item When \texttt{xct == 0x9}:
-		\texttt{cpy.s} that writes to \texttt{inten} in user mode.
+		\texttt{cpy.s} that writes to \texttt{ie} in user mode.
 	\item When \texttt{xct == 0xa}:
 		\texttt{cpy.s} that reads from \texttt{xct} in user mode.
 	\item When \texttt{xct == 0xb}:
@@ -386,13 +402,13 @@
 				%%--------
 				%\end{itemize}
 			\item \texttt{mul dA, dB, dC}
-				\begin{itemize}
-				%--------
-				\item This instruction causes an exception if \texttt{dB}
-					or \texttt{dC} is of the following types: \texttt{u64},
-					\texttt{s64}.
-				%--------
-				\end{itemize}
+				%\begin{itemize}
+				%%--------
+				%\item This instruction causes an exception if \texttt{dB}
+				%	or \texttt{dC} is of the following types: \texttt{u64},
+				%	\texttt{s64}.
+				%%--------
+				%\end{itemize}
 
 			\item \texttt{and dA, dB, dC}
 			\item \texttt{or dA, dB, dC}
@@ -401,9 +417,9 @@
 				\begin{itemize}
 				%--------
 				\item Logical shift left.
-				\item This instruction causes an exception if \texttt{dA},
-					\texttt{dB}, or \texttt{dC} is of the following types:
-					\texttt{u64}, \texttt{s64}.
+				%\item This instruction causes an exception if \texttt{dA},
+				%	\texttt{dB}, or \texttt{dC} is of the following types:
+				%	\texttt{u64}, \texttt{s64}.
 				\item This instruction casts a temporary copy of
 					\texttt{dC} to the unsigned type that is the same size
 					as \texttt{dA}'s type and uses that instead of
@@ -416,9 +432,9 @@
 				%--------
 				\item Logical shift right if \texttt{dA} is unsigned, or
 					arithmetic shift right if \texttt{dA} is signed.
-				\item This instruction causes an exception if \texttt{dA},
-					\texttt{dB}, or \texttt{dC} is of the following types:
-					\texttt{u64}, \texttt{s64}.
+				%\item This instruction causes an exception if \texttt{dA},
+				%	\texttt{dB}, or \texttt{dC} is of the following types:
+				%	\texttt{u64}, \texttt{s64}.
 				\item This instruction casts a temporary copy of
 					\texttt{dC} to the unsigned type that is the same size
 					as \texttt{dA}'s type and uses that instead of
@@ -429,9 +445,9 @@
 				\begin{itemize}
 				%--------
 				\item Rotate left.
-				\item This instruction causes an exception if \texttt{dA},
-					\texttt{dB}, or \texttt{dC} is of the following types:
-					\texttt{u64}, \texttt{s64}.
+				%\item This instruction causes an exception if \texttt{dA},
+				%	\texttt{dB}, or \texttt{dC} is of the following types:
+				%	\texttt{u64}, \texttt{s64}.
 				\item This instruction casts a temporary copy of
 					\texttt{dC} to the unsigned type that is the same size
 					as \texttt{dA}'s type and uses that instead of
@@ -442,9 +458,9 @@
 				\begin{itemize}
 				%--------
 				\item Rotate right.
-				\item This instruction causes an exception if \texttt{dA},
-					\texttt{dB}, or \texttt{dC} is of the following types:
-					\texttt{u64}, \texttt{s64}.
+				%\item This instruction causes an exception if \texttt{dA},
+				%	\texttt{dB}, or \texttt{dC} is of the following types:
+				%	\texttt{u64}, \texttt{s64}.
 				\item This instruction casts a temporary copy of
 					\texttt{dC} to the unsigned type that is the same size
 					as \texttt{dA}'s type and uses that instead of
@@ -454,9 +470,9 @@
 			\item \texttt{add dA, dB.addr, dC}
 				\begin{itemize}
 				%--------
-				\item This instruction causes an exception if \texttt{dA}
-					or \texttt{dC} is of the following types: \texttt{u64},
-					\texttt{s64}.
+				%\item This instruction causes an exception if \texttt{dA}
+				%	or \texttt{dC} is of the following types: \texttt{u64},
+				%	\texttt{s64}.
 				\item For \texttt{add.s dA, dB.addr, dC}, this instruction
 					uses the value of
 					\texttt{cast(dA.type, align(dB.type, dB.addr))}
@@ -491,9 +507,9 @@
 			\item \texttt{shl dA, dB.addr, dC}
 				\begin{itemize}
 				%--------
-				\item This instruction causes an exception if \texttt{dA}
-					or \texttt{dC} is of the following types: \texttt{u64},
-					\texttt{s64}.
+				%\item This instruction causes an exception if \texttt{dA}
+				%	or \texttt{dC} is of the following types: \texttt{u64},
+				%	\texttt{s64}.
 				\item For \texttt{shl.s dA, dB.addr, dC}, this instruction
 					uses the value of
 					\texttt{cast(dA.type, align(dB.type, dB.addr))}
@@ -513,11 +529,11 @@
 			\item \texttt{div.s dA, dB, dC, dD}
 				\begin{itemize}
 				%--------
-				%\item This instruction causes an exception if \texttt{dB}
-				%	or \texttt{dC} is of the following types:
-				%	\texttt{u64}, \texttt{s64}.
-				\item This instruction causes an exception if \texttt{dC}
-					is of the following types: \texttt{u64}, \texttt{s64}.
+				%%\item This instruction causes an exception if \texttt{dB}
+				%%	or \texttt{dC} is of the following types:
+				%%	\texttt{u64}, \texttt{s64}.
+				%\item This instruction causes an exception if \texttt{dC}
+				%	is of the following types: \texttt{u64}, \texttt{s64}.
 				\item This instruction writes the quotient into
 					\texttt{dA}, and the remainder into \texttt{dD}.
 				%--------
@@ -525,11 +541,11 @@
 			\item \texttt{div.v dA, dB, dC, dD}
 				\begin{itemize}
 				%--------
-				%\item This instruction causes an exception if \texttt{dB}
-				%	or \texttt{dC} is of the following types:
-				%	\texttt{u64}, \texttt{s64}.
-				\item This instruction causes an exception if \texttt{dC}
-					is of the following types: \texttt{u64}, \texttt{s64}.
+				%%\item This instruction causes an exception if \texttt{dB}
+				%%	or \texttt{dC} is of the following types:
+				%%	\texttt{u64}, \texttt{s64}.
+				%\item This instruction causes an exception if \texttt{dC}
+				%	is of the following types: \texttt{u64}, \texttt{s64}.
 				\item This instruction writes the quotient into
 					\texttt{dA}, and the remainder into \texttt{dD}.
 				%--------
@@ -576,8 +592,8 @@
 					product of all the scalar data elements of the
 					temporary copy of \texttt{dB}, then stores the result
 					in \texttt{dA}'s scalar data.
-				\item This instruction causes an exception if \texttt{dA}
-					is of the following types: \texttt{u64}, \texttt{s64}.
+				%\item This instruction causes an exception if \texttt{dA}
+				%	is of the following types: \texttt{u64}, \texttt{s64}.
 				%--------
 				\end{itemize}
 			\item \texttt{max.r dA, dB}
@@ -1149,7 +1165,7 @@
 				\begin{itemize}
 				%--------
 				\item This instruction returns from an interrupt if
-					\texttt{dA} is non-zero, setting \texttt{inten} to
+					\texttt{dA} is non-zero, setting \texttt{ie} to
 					\texttt{0b1}.
 				\item This instruction causes an exception if the processor
 					is in user mode.
@@ -1379,18 +1395,18 @@
 		\item Instruction List:
 			\begin{enumerate}
 			%--------
-			\item \texttt{cpy.s dA, inten}
+			\item \texttt{cpy.s dA, ie}
 				\begin{itemize}
 				%--------
-				\item This instruction copies \texttt{inten} to
+				\item This instruction copies \texttt{ie} to
 					\texttt{dA.scalar\_data}.
 				%--------
 				\end{itemize}
-			\item \texttt{cpy.s inten, dA}
+			\item \texttt{cpy.s ie, dA}
 				\begin{itemize}
 				%--------
 				\item This instruction copies \texttt{dA.scalar\_data} to
-					\texttt{inten}.
+					\texttt{ie}.
 				%--------
 				\end{itemize}
 			\item \texttt{cpy.s dA, xct}
