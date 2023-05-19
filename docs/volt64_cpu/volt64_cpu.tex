@@ -51,7 +51,7 @@
 \begin{document}
 %--------
 	\font\titlefont={Times New Roman} at 20pt
-	\title{{\titlefont Volt32 CPU}}
+	\title{{\titlefont Volt64 CPU}}
 
 	\font\bottomtextfont={Times New Roman} at 12pt
 	\date{{\bottomtextfont} \today}
@@ -87,7 +87,8 @@
 		supervisor mode and the LARs owned by the user mode. There are 64
 		supervisor mode ILARs, 64 supervisor mode DLARs, 64 user mode
 		ILARs, and 64 user mode DLARs.
-	\item Addresses are 32-bit.
+	%\item Addresses are 32-bit.
+	\item Addresses are 64-bit.
 	\item 8 types of integer operations are supported, specifically
 		\texttt{u8}, \texttt{s8},
 		\texttt{u16}, \texttt{s16},
@@ -135,14 +136,15 @@
 			%%(5 because 128 bytes long ILARs, and forced alignment of
 			%%instructions)
 			%of their addresses. The number of bits is (7 - 2 = 5)
-			%because of alignment of 
+			%because of alignment of
 		\item An ILAR's data field is 128 bytes long. It is composed of
 			32-bit instructions aligned to 32 bits.
 		\item An ILAR's scalar offset field is (7 - 2 = 5)-bit due to
 			instructions being 32-bit and the data field being 128 bytes
 			long.
 		\item The \texttt{base\_address} field of an ILAR is
-			(32 - 6 = 26)-bit.
+			%(32 - 6 = 26)-bit.
+			(64 - 6 = 58)-bit.
 		\item An ILAR's tag field is 7-bit because there are 128 total
 			ILARs.
 		%--------
@@ -150,7 +152,7 @@
 	\item DLARs
 		\begin{itemize}
 		%--------
-		\item In user mode, DLARs 0 to 63 are referred to as 
+		\item In user mode, DLARs 0 to 63 are referred to as
 			\texttt{d0}, \texttt{d1}, \texttt{d2}, ..., \texttt{d57},
 			\texttt{d58},
 			\texttt{dt0} (aka \texttt{d59}, assembler temporary 0),
@@ -187,11 +189,16 @@
 			is forcibly aligned to the width of the DLAR's type when used
 			as source operands in instructions that read from the full
 			\texttt{address} field of the instruction.
-		\item The base address field of a DLAR is (32 - 6 = 26)-bit.
+		\item The base address field of a DLAR is
+			%(32 - 6 = 26)-bit.
+			(64 - 6 = 58)-bit.
 		\item Note that the full address of a scalar located in a DLAR,
 			\texttt{dA}, is determined by the following formula:
-			\texttt{cat(dA.base\_address, dA.scalar\_offset)}. For types
-			other than \texttt{u8} and \texttt{s8}, the  
+			\texttt{cat(dA.base\_address, dA.scalar\_offset)}.
+			If \texttt{dA.type} is a size other than that of
+			\texttt{u8} and \texttt{s8},
+			\texttt{dA.scalar\_offset} will be aligned to the size of
+			\texttt{dA.type} for this calculation.
 		\item DLARs can take on the following types (3-bit enum):
 			\begin{itemize}
 			%--------
@@ -224,7 +231,8 @@
 		\item This register is a flag indicating whether or not an
 			interrupt can be serviced. It can be read from/written to using
 			\texttt{cpy} instructions.
-		\item The \texttt{reti} instruction sets \texttt{ie} to
+		\item The \texttt{retiz} and \texttt{retinz} instructions
+			set \texttt{ie} to
 			\texttt{0b1} and returns to user mode from supervisor mode.
 		%--------
 		\end{itemize}
@@ -277,13 +285,203 @@
 	%--------
 	\end{itemize}
 	\newpage
+
+\section{Vector Type Casting}
+	\begin{itemize}
+	%--------
+	\item The scalar offset field determines which sub-vectors of a DLAR to
+		use for vector operations when DLAR types do not match,
+		%with the following restriction:
+		%the type of operand \texttt{dB} determines the
+		with the following behavior:
+		\begin{enumerate}
+		%--------
+		% 1
+		% to=d2: type=u16, soffs=7'b000_0000
+		% from=d3: type=u8, soffs=7'b000_1000
+		% up-cast:
+		\item When up-casting any source DLAR, \texttt{dsrc},
+			to the type of any destination DLAR, \texttt{ddst},
+			the offset into \texttt{dsrc.data}
+				of element \texttt{0x0} of the sub-vector
+			of \texttt{dsrc.data} that will be used will
+			be calculated by aligning \texttt{dsrc.scalar\_offset}
+			%to the base 2 logarithm of the number of vector
+			%elements in
+			%\texttt{ddst}.
+			%%\texttt{dsrc}.
+			to \texttt{ddst.type}.
+			%to \texttt{dsrc.type}.
+		% 2
+		\item When down-casting any source DLAR, \texttt{dsrc},
+			to the type of any destination DLAR, \texttt{ddst},
+			the offset into \texttt{ddst.data}
+				of element \texttt{0x0} of the sub-vector
+			of \texttt{ddst.data} that will be used will
+			be calculated by aligning \texttt{ddst.scalar\_offset}
+			%to the base 2 logarithm of the number of vector
+			%elements in
+			%\texttt{dsrc}.
+			%\texttt{ddst}.
+			%to \texttt{ddst.type}.
+			to \texttt{dsrc.type}.
+		%\item When down-casting any source DLAR, \texttt{dsrc},
+		%	to the type of any destination DLAR, \texttt{ddst},
+		%	the index of element \texttt{0x0} of the sub-vector of
+		%	\texttt{ddst.data} that will be used will
+		%	be calculated by aligning \texttt{ddst.scalar\_offset}
+		%	to the base 2 logarithm
+		% 3
+		%\item If \texttt{dB.type} and \texttt{dC.type} are
+		%	both the same size, the following behavior holds:
+		%	(1) if \texttt{dB.type} and \texttt{dC.type} are to be
+		%	up-casted to the type of a
+		%	destination DLAR, \texttt{ddst}, the sub-vectors
+		%	of \texttt{dB.data} and \texttt{dC.data}
+		%	that will be used are selected as in item \textbf{1.}
+		%	in this list;
+		%	(2) otherwise, if down-casting \texttt{dB} and
+		%	\texttt{dC}, the sub-vector of a destination DLAR,
+		%	\texttt{ddst}, that will be used for will be as in
+		%	item \textbf{2.} of this list.
+		\item If either of the following conditions is met:
+			\begin{itemize}
+			%--------
+			%\item \texttt{dB.type} and \texttt{dC.type} are both
+			%	smaller in size than the type of a
+			%	destination DLAR, \texttt{ddst},
+			%	(though \texttt{dB.type} and \texttt{dC.type}
+			%	\textit{don't} have to be
+			%	the same size)
+			\item \texttt{dB.type} and \texttt{dC.type} are both
+				smaller in size than the type of a
+				destination DLAR, \texttt{ddst},
+				and \texttt{dB.type} and \texttt{dC.type}
+				are the same size
+			\item \texttt{dB.type} and \texttt{dC.type} are both
+				smaller in size than the type of a
+				destination DLAR, \texttt{ddst},
+				and \texttt{dB.type} and \texttt{dC.type}
+				are not the same size
+			%--------
+			\end{itemize}
+			then up-casting will be performed on both
+			\texttt{dB} and \texttt{dC} as in
+			item \textbf{1.} of this list.
+		% 4
+		\item If the following conditions are all met:
+			\begin{itemize}
+			%--------
+			\item \texttt{dB.type} and \texttt{dC.type} are both
+				the same size
+			\item the shared size of
+				\texttt{dB.type} and \texttt{dC.type} is larger
+				than the size of the type of a
+				destination DLAR, \texttt{ddst}
+			%--------
+			\end{itemize}
+			then the down-casting will be performed on both
+			\texttt{dB} and \texttt{dC} as in
+			item \textbf{2.} of this list.
+		% 5
+		\item If the following conditions are all met:
+			\begin{itemize}
+			%--------
+			\item exactly one of
+				\texttt{dB.type} and \texttt{dC.type}
+				is smaller than the type of a
+				destination DLAR, \texttt{ddst}
+			\item there also exists a source DLAR,
+				\texttt{dB} or \texttt{dC},
+				whose type is the same size as \texttt{ddst.type}
+			%--------
+			\end{itemize}
+			then only the source DLAR whose type is smaller than
+			\texttt{ddst.type} will be up-casted, as in
+			item \textbf{1.} of this list.
+			The other source DLAR will be used as is, without
+			casting.
+		% 6
+		\item If the following conditions are all met:
+			\begin{itemize}
+			%--------
+			\item exactly one of
+				\texttt{dB.type} and \texttt{dC.type}
+				is larger than the type of a
+				destination DLAR, \texttt{ddst},
+			\item there also exists a source DLAR
+				(\texttt{dB} or \texttt{dC})
+				whose type is the same size as \texttt{ddst.type}
+			%--------
+			\end{itemize}
+			only the source DLAR with a type larger than
+			\texttt{ddst.type} will be down-casted, as in
+			item \textbf{2.} of this list.
+
+			Also, the sub-vector of the source DLAR whose type is
+			the same size as \texttt{ddst.type} will be selected as
+			if item \textbf{2.} of this list were applied with the
+			two source DLARs, where the "destination" DLAR for that
+			operation is the source DLAR whose type is same size as
+			\texttt{ddst.type}.
+
+			Note that the source DLAR whose type is the same size
+			as \texttt{ddst.type} will not have any of its fields
+			changed by this second application of
+			item \textbf{2.} of this list.
+		%% 7
+		%\item If the following conditions are all met:
+		%	\begin{itemize}
+		%	%--------
+		%	\item \texttt{dB.type} and \texttt{dC.type} do not have
+		%		the same size
+		%	\item \texttt{dB.type} and \texttt{dC.type}
+		%		are both larger in size than the type of a
+		%		destination DLAR, \texttt{ddst}
+		%	%--------
+		%	\end{itemize}
+		%	%then the source DLAR with the larger type will be used
+		%	%then \texttt{dB.data} and \texttt{dC.data} will both be
+		%	%temporarily casted to \texttt{ddst.type}, and
+		% 7
+		% TODO: continue here
+		\item If the following conditions are all met:
+			\begin{itemize}
+			%--------
+			\item \texttt{dB.type} and \texttt{dC.type} do not have
+				the same size
+			\item neither \texttt{dB.type} nor \texttt{dC.type}
+				is the same size as a
+				destination DLAR, \texttt{ddst}
+			\item Either of the following conditions is met:
+				\begin{itemize}
+				%--------
+				\item exactly one of
+					\texttt{dB.type} and \texttt{dC.type} is
+					has a larger size than \texttt{ddst.type}, and
+					the type of the other source DLAR has a smaller
+					size than \texttt{ddst.type}
+				\item both of
+					\texttt{dB.type} and \texttt{dC.type} is
+					have larger sizes than \texttt{ddst.type}
+				%--------
+				\end{itemize}
+			%--------
+			\end{itemize}
+			then \texttt{dC.type} will be instead interpreted as
+			\texttt{dB.type}, and the specific item in this list
+			which applies to that situation will be performed.
+		%--------
+		\end{enumerate}
+	%--------
+	\end{itemize}
 \section{Exceptions}
 	Some instructions may cause an exception to occur, putting the
 	processor in supervisor mode.
 
 	The following exceptions may occur during normal execution of a
 	program. \texttt{xct} is set to a numerical value representing these
-	upon the processor encountering an exception. 
+	upon the processor encountering an exception.
 
 	\begin{itemize}
 	%--------
@@ -292,8 +490,10 @@
 		Taking a non-software interrupt (which would also set \texttt{ie}
 		to \texttt{0b0}).
 	\item When \texttt{xct == 0x2}: \texttt{swi}.
-	\item When \texttt{xct == 0x3}: \texttt{reti} when in user mode.
-	\item When \texttt{xct == 0x4}: \texttt{retx} when in user mode.
+	\item When \texttt{xct == 0x3}:
+		\texttt{retiz} or \texttt{retinz} when in user mode.
+	\item When \texttt{xct == 0x4}:
+		\texttt{retxz} or \texttt{retxnz} when in user mode.
 	\item When \texttt{xct == 0x5}: Undefined instruction.
 	\item When \texttt{xct == 0x6}: Division by zero.
 	\item When \texttt{xct == 0x7}:
@@ -376,7 +576,7 @@
 			1. These two instructions have opcodes of \texttt{0b1110} and
 			\texttt{0b1111}, respectively, such that bit 0 of the
 			instruction specifies the same information as the \texttt{v}
-			bit does for Encoding 0.
+			bit does for other instructions in Encoding 0.
 		\item Instruction List:
 			\begin{enumerate}
 			%--------
@@ -494,11 +694,13 @@
 				%	\texttt{s64}.
 				\item For \texttt{add.s dA, iB.addr, dC}, this instruction
 					uses the value of
-					\texttt{cast(dA.type, align(u32, dB.addr))}
+					%\texttt{cast(dA.type, align(u64, iB.addr))}
+					\texttt{cast(dA.type, iB.addr)}
 					as the second argument of the \texttt{add}.
 				\item For \texttt{add.v dA, iB.addr, dC}, this instruction
 					duplicates the value of
-					\texttt{cast(dA.type, align(u32, iB.addr))}
+					%\texttt{cast(dA.type, align(u64, iB.addr))}
+					\texttt{cast(dA.type, iB.addr)}
 					(a scalar) into a temporary (DLAR data's length number
 					of bytes long) vector of element type \texttt{dA.type}
 					for the purposes of this calculation.
@@ -682,7 +884,7 @@
 			%--------
 			\end{itemize}
 		%\item For these instructions, the \texttt{dB} DLAR's scalar
-		%	data field (temporarily casted to the \texttt{u32} type) and
+		%	data field (temporarily casted to the \texttt{u64} type) and
 		%	the \texttt{dC} DLAR's address field are added together,
 		%	plus \texttt{simm7} (sign-extended to 32-bit), to calculate the
 		%	address being loaded from.
@@ -690,7 +892,7 @@
 		%	instruction name, with, for example, \texttt{ldu8} setting
 		%	\texttt{dA}'s type to \texttt{u8}.
 		\item For these instructions, the value of
-			\texttt{cast(u32, dB.scalar\_data) + cast(s32, simm12)}
+			\texttt{cast(u64, dB.scalar\_data) + cast(s64, simm12)}
 			is used as the address to load from.
 		\item Also, the type \texttt{dA} is set to is indicated in the
 			instruction name, with, for example, \texttt{ldu8i} setting
@@ -747,7 +949,7 @@
 			%--------
 			\end{itemize}
 		\item For these instructions, the value of
-			\texttt{cast(u32, align(dB.type, dB.addr)) + cast(s32, simm12)}
+			\texttt{cast(u64, align(dB.type, dB.addr)) + cast(s64, simm12)}
 			is used as the address to load from.
 		\item Also, the type \texttt{dA} is set to is indicated in the
 			instruction name, with, for example, \texttt{ldu8} setting
@@ -796,8 +998,8 @@
 			%--------
 			\end{itemize}
 		\item For these instructions, the value of
-			\texttt{cast(u32, dB.scalar\_data)
-				+ cast(u32, dC.scalar\_data)}
+			\texttt{cast(u64, dB.scalar\_data)
+				+ cast(u64, dC.scalar\_data)}
 			is used as the address to load from.
 		\item Also, the type \texttt{dA} is set to is indicated in the
 			instruction name, with, for example, \texttt{ldu8} setting
@@ -851,7 +1053,7 @@
 			%--------
 			\end{itemize}
 		%\item For these instructions, the \texttt{dB} DLAR's scalar
-		%	data field (temporarily casted to the \texttt{u32} type) and
+		%	data field (temporarily casted to the \texttt{u64} type) and
 		%	the \texttt{dC} DLAR's address field are added together,
 		%	plus \texttt{simm7} (sign-extended to 32-bit), to calculate the
 		%	address being stored to.
@@ -859,7 +1061,7 @@
 		%	instruction name, with, for example, \texttt{stu8} setting
 		%	\texttt{dA}'s type to \texttt{u8}.
 		\item For these instructions, the value of
-			\texttt{cast(u32, dB.scalar\_data) + cast(s32, simm12)}
+			\texttt{cast(u64, dB.scalar\_data) + cast(s64, simm12)}
 			is used as the address being stored to.
 		\item Also, the type \texttt{dA} is set to is indicated in the
 			instruction name, with, for example, \texttt{stu8} setting
@@ -964,7 +1166,7 @@
 				\begin{itemize}
 				%--------
 				\item This instruction casts (a temporary copy of) the
-					scalar data of \texttt{dB} to the \texttt{u32} type.
+					scalar data of \texttt{dB} to the \texttt{u64} type.
 					The casted scalar data is then stored into every
 					\texttt{u32} vector element of \texttt{dA}. The type of
 					\texttt{dA} is then changed to \texttt{u32}.
@@ -974,7 +1176,7 @@
 				\begin{itemize}
 				%--------
 				\item This instruction casts (a temporary copy of) the
-					scalar data of \texttt{dB} to the \texttt{s32} type.
+					scalar data of \texttt{dB} to the \texttt{s64} type.
 					The casted scalar data is then stored into every
 					\texttt{s32} vector element of \texttt{dA}. The type of
 					\texttt{dA} is then changed to \texttt{s32}.
@@ -1057,10 +1259,10 @@
 		%\item For instructions using Encoding 0, the address to
 		%	\texttt{fetch} from is computed by adding the address field of
 		%	\texttt{iB} to the scalar data field (temporarily casted to the
-		%	\texttt{u32} type) of the \texttt{dC} DLAR.
+		%	\texttt{u64} type) of the \texttt{dC} DLAR.
 		\item For instructions using Encoding 0, the address to
 			\texttt{fetch} from is computed with the following formula:
-			\texttt{cast(u32, align(u32, dC.scalar\_data))}.
+			\texttt{cast(u64, align(u64, dC.scalar\_data))}.
 		%%\item Also, the address to \texttt{fetch} from is computed by
 		%%	adding these two temporary values to a temporary value
 		%%	equivalent to the 32-bit sign extended value of
@@ -1068,10 +1270,11 @@
 		%\item For instructions using Encoding 1, the address to
 		%	\texttt{fetch} from is computed by adding the address field of
 		%	\texttt{iB} to the the value
-		%	\texttt{cast(s32, (isimm11 << 2))}.
+		%	\texttt{cast(s64, (isimm11 << 2))}.
 		\item For instructions using Encoding 1, the address to
 			\texttt{fetchi} from is computed with the following formula:
-			\texttt{cast(u32, iB.addr) + cast(u32, (isimm11 << 2))}.
+			%\texttt{cast(u64, iB.addr) + cast(u64, (isimm11 << 2))}.
+			\texttt{iB.addr + cast(u64, (isimm11 << 2))}.
 		\item Additionally, this and any other instructions with
 			"\texttt{fetch}" in their names are the only way to fetch
 			instructions from memory (or other ILARs) in this CPU's design.
@@ -1138,14 +1341,6 @@
 		\item Instruction List:
 			\begin{enumerate}
 			%--------
-			\item \texttt{sel dA, iB, iimm5, jimm5}
-				\begin{itemize}
-				%--------
-				\item This instruction jumps to \texttt{iB[iimm5 << 2]} if
-					the particular data field of \texttt{dA} is non-zero,
-					otherwise to the address \texttt{iB[jimm5 << 2]}.
-				%--------
-				\end{itemize}
 			\item \texttt{jz dA, iB, iimm5}
 				\begin{itemize}
 				%--------
@@ -1161,7 +1356,27 @@
 					non-zero.
 				%--------
 				\end{itemize}
-			\item \texttt{reti dA}
+			\item \texttt{sel dA, iB, iimm5, jimm5}
+				\begin{itemize}
+				%--------
+				\item This instruction jumps to \texttt{iB[iimm5 << 2]} if
+					the particular data field of \texttt{dA} is non-zero,
+					otherwise to the address \texttt{iB[jimm5 << 2]}.
+				%--------
+				\end{itemize}
+			\item \textit{Reserved for future expansion.}
+
+			\item \texttt{retiz dA}
+				\begin{itemize}
+				%--------
+				\item This instruction returns from an interrupt if
+					\texttt{dA} is zero, setting \texttt{ie} to
+					\texttt{0b1}.
+				\item This instruction causes an exception if the processor
+					is in user mode.
+				%--------
+				\end{itemize}
+			\item \texttt{retinz dA}
 				\begin{itemize}
 				%--------
 				\item This instruction returns from an interrupt if
@@ -1171,8 +1386,16 @@
 					is in user mode.
 				%--------
 				\end{itemize}
-
-			\item \texttt{retx dA}
+			\item \texttt{retxz dA}
+				\begin{itemize}
+				%--------
+				\item This instruction returns from supervisor mode to user
+					mode if \texttt{dA} is zero.
+				\item This instruction causes an exception if the processor
+					is in user mode.
+				%--------
+				\end{itemize}
+			\item \texttt{retxnz dA}
 				\begin{itemize}
 				%--------
 				\item This instruction returns from supervisor mode to user
@@ -1181,9 +1404,6 @@
 					is in user mode.
 				%--------
 				\end{itemize}
-			\item \textit{Reserved for future expansion.}
-			\item \textit{Reserved for future expansion.}
-			\item \textit{Reserved for future expansion.}
 
 			\item \textit{Reserved for future expansion.}
 			\item \textit{Reserved for future expansion.}
@@ -1214,7 +1434,7 @@
 			\item \texttt{S}:
 				\begin{itemize}
 				%--------
-				\item when \texttt{0b0}: 
+				\item when \texttt{0b0}:
 					Destination LARs (the ones starting with \texttt{iA} or
 					\texttt{dA}) or source LARs (the ones starting with
 					\texttt{iB}/\texttt{dB} and, if the instruction uses
@@ -1533,8 +1753,8 @@
 			\end{itemize}
 		\item These instructions perform a read from/write to the IO
 			address calculated by the following formula:
-			\texttt{cast(u32, dB.scalar\_data)
-				+ cast(u32, dC.scalar\_data)}.
+			\texttt{cast(u64, dB.scalar\_data)
+				+ cast(u64, dC.scalar\_data)}.
 		\item When a scalar operation is being performed, only the
 			scalar data of \texttt{dA} is read into from/written out to IO
 			space.
@@ -1869,7 +2089,7 @@
 	%		%--------
 	%		\end{itemize}
 	%	\item For these instructions, the \texttt{dB} DLAR's scalar
-	%		data field (temporarily casted to the \texttt{u32} type) and
+	%		data field (temporarily casted to the \texttt{u64} type) and
 	%		the \texttt{ipc} ILAR's address field are added together,
 	%		plus \texttt{simm13} (sign-extended to 32-bit), to calculate
 	%		the address being loaded from.
@@ -1910,14 +2130,14 @@
 	%	%\item Note that, for the first 10 instructions, memory is forcibly
 	%	%	loaded from/stored to at the address calculated by the
 	%	%	following formula:
-	%	%	\texttt{cast(u32, dB.scalar\_data) + cast(s32, simm12)}.
+	%	%	\texttt{cast(u64, dB.scalar\_data) + cast(s64, simm12)}.
 	%	%	Also, for the first 10 instructions, if an address is to be
 	%	%	evicted from the DLAR file, then it will be done before the
 	%	%	data is forcibly loaded from memory.  Additionally, for the
 	%	%	first 10 instructions, the \texttt{dirty} flag of the
 	%	%	\texttt{dA} DLAR will be set to \texttt{0b0}, or
 	%	%	\texttt{false}. Lastly, for these 10 instructions, the type
-	%	%	that \texttt{dA} is set to is indicated by the name 
+	%	%	that \texttt{dA} is set to is indicated by the name
 	%	\item Instruction List:
 	%		\begin{enumerate}
 	%		%--------

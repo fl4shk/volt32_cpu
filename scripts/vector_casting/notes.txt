@@ -1,0 +1,96 @@
+#--------
+nbytes:4 to:(Sz8 0 0) from:(Sz16 0 0) vinfo:(vtype:Sz16 vsz:2 voffs:0 vind:0)
+nbytes:4 to:(Sz8 0 0) from:(Sz16 2 1) vinfo:(vtype:Sz16 vsz:2 voffs:0 vind:0)
+nbytes:4 to:(Sz8 0 0) from:(Sz32 0 0) vinfo:(vtype:Sz32 vsz:1 voffs:0 vind:0)
+nbytes:4 to:(Sz8 1 1) from:(Sz16 0 0) vinfo:(vtype:Sz16 vsz:2 voffs:2 vind:1)
+nbytes:4 to:(Sz8 1 1) from:(Sz16 2 1) vinfo:(vtype:Sz16 vsz:2 voffs:2 vind:1)
+nbytes:4 to:(Sz8 1 1) from:(Sz32 0 0) vinfo:(vtype:Sz32 vsz:1 voffs:1 vind:1)
+nbytes:4 to:(Sz8 2 2) from:(Sz16 0 0) vinfo:(vtype:Sz16 vsz:2 voffs:0 vind:0)
+nbytes:4 to:(Sz8 2 2) from:(Sz16 2 1) vinfo:(vtype:Sz16 vsz:2 voffs:0 vind:0)
+nbytes:4 to:(Sz8 2 2) from:(Sz32 0 0) vinfo:(vtype:Sz32 vsz:1 voffs:2 vind:2)
+nbytes:4 to:(Sz8 3 3) from:(Sz16 0 0) vinfo:(vtype:Sz16 vsz:2 voffs:2 vind:1)
+nbytes:4 to:(Sz8 3 3) from:(Sz16 2 1) vinfo:(vtype:Sz16 vsz:2 voffs:2 vind:1)
+
+nbytes:4 to:(Sz8 3 3) from:(Sz32 0 0) vinfo:(vtype:Sz32 vsz:1 voffs:3 vind:3)
+This isn't right, maybe?
+I think we should instead have (voffs:0 vind:0).
+How should this work?
+Maybe it actually does make sense to do this? I don't know yet.
+
+nbytes:4 to:(Sz16 0 0) from:(Sz8 0 0) vinfo:(vtype:Sz16 vsz:2 voffs:0 vind:0)
+
+nbytes:4 to:(Sz16 0 0) from:(Sz8 1 1) vinfo:(vtype:Sz16 vsz:2 voffs:2 vind:1)
+This definitely isn't right. The destination voffs should still be 0 in this case.
+
+nbytes:4 to:(Sz16 0 0) from:(Sz8 2 2) vinfo:(vtype:Sz16 vsz:2 voffs:0 vind:0)
+nbytes:4 to:(Sz16 0 0) from:(Sz8 3 3) vinfo:(vtype:Sz16 vsz:2 voffs:2 vind:1)
+nbytes:4 to:(Sz16 0 0) from:(Sz32 0 0) vinfo:(vtype:Sz32 vsz:2 voffs:0 vind:0)
+nbytes:4 to:(Sz16 2 1) from:(Sz8 0 0) vinfo:(vtype:Sz16 vsz:2 voffs:0 vind:0)
+nbytes:4 to:(Sz16 2 1) from:(Sz8 1 1) vinfo:(vtype:Sz16 vsz:2 voffs:2 vind:1)
+nbytes:4 to:(Sz16 2 1) from:(Sz8 2 2) vinfo:(vtype:Sz16 vsz:2 voffs:0 vind:0)
+nbytes:4 to:(Sz16 2 1) from:(Sz8 3 3) vinfo:(vtype:Sz16 vsz:2 voffs:2 vind:1)
+nbytes:4 to:(Sz16 2 1) from:(Sz32 0 0) vinfo:(vtype:Sz32 vsz:2 voffs:2 vind:2)
+nbytes:4 to:(Sz32 0 0) from:(Sz8 0 0) vinfo:(vtype:Sz32 vsz:1 voffs:0 vind:0)
+nbytes:4 to:(Sz32 0 0) from:(Sz8 1 1) vinfo:(vtype:Sz32 vsz:1 voffs:1 vind:1)
+nbytes:4 to:(Sz32 0 0) from:(Sz8 2 2) vinfo:(vtype:Sz32 vsz:1 voffs:2 vind:2)
+nbytes:4 to:(Sz32 0 0) from:(Sz8 3 3) vinfo:(vtype:Sz32 vsz:1 voffs:3 vind:3)
+nbytes:4 to:(Sz32 0 0) from:(Sz16 0 0) vinfo:(vtype:Sz32 vsz:2 voffs:0 vind:0)
+nbytes:4 to:(Sz32 0 0) from:(Sz16 2 1) vinfo:(vtype:Sz32 vsz:2 voffs:2 vind:2)
+#--------
+# The below appears to be a correct implementation of the ISA spec's
+# current idea on how vector type up-casting/down-casting should work, but
+# is it a good idea to do things this way?
+# (As of this writing, the script implements the algorithm of interest for
+# a smaller number of bytes than Volt64 will have, with, specifically, only
+# four bytes long vectors, which is definitely fewer than the final design
+# will have.)
+# Does it even make sense for down-casting to use `dsrc.type` to align
+# `ddst`? I think it does make sense because selection of the sub-vector of
+# `ddst.data` should be forced to be the same size as the number of vector
+# elements of `dsrc.data`.
+# I think it also makes sense, for up-casting, to pick a sub-vector of
+# `dsrc.data` such that the scalar offset of that sub-vector is the value
+# of `dsrc.soffs` that is aligned to `ddst.type`. That is the same
+# sub-vector selection method as what's already in the ISA spec and also in
+# the test script, "vector_casting.py".
+
+nbytes:4 to:(Sz8 0 0 4) from:(Sz16 0 0 2) vinfo:(to Sz8 2 o:0 i:0)
+nbytes:4 to:(Sz8 0 0 4) from:(Sz16 2 1 2) vinfo:(to Sz8 2 o:0 i:0)
+
+nbytes:4 to:(Sz8 0 0 4) from:(Sz32 0 0 1) vinfo:(to Sz8 1 o:0 i:0)
+
+nbytes:4 to:(Sz8 1 1 4) from:(Sz16 0 0 2) vinfo:(to Sz8 2 o:0 i:0)
+nbytes:4 to:(Sz8 1 1 4) from:(Sz16 2 1 2) vinfo:(to Sz8 2 o:0 i:0)
+nbytes:4 to:(Sz8 1 1 4) from:(Sz32 0 0 1) vinfo:(to Sz8 1 o:0 i:0)
+nbytes:4 to:(Sz8 2 2 4) from:(Sz16 0 0 2) vinfo:(to Sz8 2 o:2 i:1)
+nbytes:4 to:(Sz8 2 2 4) from:(Sz16 2 1 2) vinfo:(to Sz8 2 o:2 i:1)
+
+nbytes:4 to:(Sz8 2 2 4) from:(Sz32 0 0 1) vinfo:(to Sz8 1 o:0 i:0)
+
+nbytes:4 to:(Sz8 3 3 4) from:(Sz16 0 0 2) vinfo:(to Sz8 2 o:2 i:1)
+nbytes:4 to:(Sz8 3 3 4) from:(Sz16 2 1 2) vinfo:(to Sz8 2 o:2 i:1)
+
+nbytes:4 to:(Sz8 3 3 4) from:(Sz32 0 0 1) vinfo:(to Sz8 1 o:0 i:0)
+
+nbytes:4 to:(Sz16 0 0 2) from:(Sz8 0 0 4) vinfo:(from Sz8 2 o:0 i:0)
+nbytes:4 to:(Sz16 0 0 2) from:(Sz8 1 1 4) vinfo:(from Sz8 2 o:0 i:0)
+
+nbytes:4 to:(Sz16 0 0 2) from:(Sz8 2 2 4) vinfo:(from Sz8 2 o:2 i:1)
+nbytes:4 to:(Sz16 0 0 2) from:(Sz8 3 3 4) vinfo:(from Sz8 2 o:2 i:1)
+
+nbytes:4 to:(Sz16 0 0 2) from:(Sz32 0 0 1) vinfo:(to Sz16 2 o:0 i:0)
+
+nbytes:4 to:(Sz16 2 1 2) from:(Sz8 0 0 4) vinfo:(from Sz8 2 o:0 i:0)
+nbytes:4 to:(Sz16 2 1 2) from:(Sz8 1 1 4) vinfo:(from Sz8 2 o:0 i:0)
+nbytes:4 to:(Sz16 2 1 2) from:(Sz8 2 2 4) vinfo:(from Sz8 2 o:2 i:1)
+nbytes:4 to:(Sz16 2 1 2) from:(Sz8 3 3 4) vinfo:(from Sz8 2 o:2 i:1)
+
+nbytes:4 to:(Sz16 2 1 2) from:(Sz32 0 0 1) vinfo:(to Sz16 2 o:0 i:0)
+
+nbytes:4 to:(Sz32 0 0 1) from:(Sz8 0 0 4) vinfo:(from Sz8 1 o:0 i:0)
+nbytes:4 to:(Sz32 0 0 1) from:(Sz8 1 1 4) vinfo:(from Sz8 1 o:0 i:0)
+nbytes:4 to:(Sz32 0 0 1) from:(Sz8 2 2 4) vinfo:(from Sz8 1 o:0 i:0)
+nbytes:4 to:(Sz32 0 0 1) from:(Sz8 3 3 4) vinfo:(from Sz8 1 o:0 i:0)
+nbytes:4 to:(Sz32 0 0 1) from:(Sz16 0 0 2) vinfo:(from Sz16 2 o:0 i:0)
+nbytes:4 to:(Sz32 0 0 1) from:(Sz16 2 1 2) vinfo:(from Sz16 2 o:0 i:0)
+#--------
